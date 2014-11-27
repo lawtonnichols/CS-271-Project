@@ -11,6 +11,12 @@
     ssh -i lawton-singapore.pem ubuntu@54.169.171.162
     ssh -i lawton-tokyo.pem ubuntu@54.65.136.5
 
+    ./paxos [54,148,215,60]
+    ./paxos [54,76,113,250]
+    ./paxos [54,93,180,143]
+    ./paxos [54,169,171,162]
+    ./paxos [54,65,136,5]
+
     git clone https://github.com/lawtonnichols/CS-271-Project.git
 
 -}
@@ -78,6 +84,9 @@ isWhiteSpace "" = True
 isWhiteSpace (x:xs) = (x == ' ' || x == '\t' || x == '\n')
                     && (isWhiteSpace xs)
 
+debug = True
+putStrLnDebug x = if debug then putStrLn x else return ()
+
 runCLICommand :: CLICommand -> IORef [CLICommand] -> IO ()
 runCLICommand command myLog = do
     -- if this is a withdrawal, make sure we can do this
@@ -98,7 +107,7 @@ runCLICommand command myLog = do
         addrInfo <- getAddrInfo (Just (defaultHints { addrFamily=AF_INET })) (Just "localhost") (Just $ "4242")
         let sockAddr = addrAddress (head addrInfo)
         sendingSock <- socket AF_INET Stream 0
-        putStrLn "runCLICommand: connecting to localhost"
+        putStrLnDebug "runCLICommand: connecting to localhost"
         connect sendingSock sockAddr
         send sendingSock (show (TryToAdd command))
         sClose sendingSock
@@ -148,7 +157,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
     hSetBuffering hdl NoBuffering
     line <- catch (hGetLine hdl) (\e -> let exc = (e :: SomeException) in return "")
     let message = if length line == 0 then Just Blank else maybeRead line :: Maybe NetworkMessage
-    putStrLn $ "processConnection: got message " ++ (show message)
+    putStrLnDebug $ "processConnection: got message " ++ (show message)
     hClose hdl
 
     -- only continue if we didn't get a blank message
@@ -156,7 +165,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
         -- send replies back to the same host, but only on its server port
         let newAddr = SockAddrInet 4242 host
         newSock <- socket AF_INET Stream 0
-        putStrLn $ "processConnection: connecting to " ++ (show host)
+        putStrLnDebug $ "processConnection: connecting to " ++ (show host)
         connect newSock newAddr
         hdl2 <- socketToHandle newSock ReadWriteMode
         hSetBuffering hdl2 NoBuffering
@@ -187,18 +196,20 @@ sendToEveryoneButMe :: NetworkMessage -> IO ()
 sendToEveryoneButMe message = do
     myAddr <- myAddress
     let everyoneButMe = filter (/= myAddr) sites
-    x <- sequence $ map (sendMessage message) everyoneButMe
+    --x <- sequence $ map (sendMessage message) everyoneButMe
+    x <- sequence $ map (\site -> forkIO (sendMessage message site)) everyoneButMe
     return ()
 
 sendToMe :: NetworkMessage -> IO ()
 sendToMe message = do
     myAddr <- myAddress
-    x <- sendMessage message myAddr
+    x <- forkIO (sendMessage message myAddr)
     return ()
 
 sendToEveryone :: NetworkMessage -> IO ()
 sendToEveryone message = do
-    x <- sequence $ map (sendMessage message) sites
+    --x <- sequence $ map (sendMessage message) sites
+    x <- sequence $ map (\site -> forkIO (sendMessage message site)) sites
     return ()
 
 toIPString :: IPAddress -> String
@@ -206,13 +217,17 @@ toIPString host = init $ foldr (\x acc -> (show x) ++ "." ++ acc) "" host
 
 sendMessage :: NetworkMessage -> IPAddress -> IO ()
 sendMessage m host = do
-    putStrLn $ "sending " ++ (show m) ++ " to " ++ (show host)
+    putStrLnDebug $ "sending " ++ (show m) ++ " to " ++ (show host)
     addrInfo <- getAddrInfo (Just (defaultHints { addrFamily=AF_INET })) (Just $ toIPString host) (Just $ "4242")
     let sockAddr = addrAddress (head addrInfo)
     sendingSock <- socket AF_INET Stream 0
-    connect sendingSock sockAddr
-    send sendingSock (show m)
-    sClose sendingSock
+    
+    catch (do connect sendingSock sockAddr
+              send sendingSock (show m);
+              sClose sendingSock) 
+        (\e -> let exc = (e :: SomeException) in return ())
+    
+    
 
 saveLog :: IORef [CLICommand] -> IO ()
 saveLog myLog = do
@@ -241,7 +256,7 @@ readLogInto myLog = do
 
 processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> IO ()
 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals = do
-    putStrLn $ "*** received " ++ (show message) ++ " ***"
+    putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     -- TODO: figure out where to reset the values & counters
     case message of 
@@ -416,9 +431,9 @@ main = do
     sock <- socket AF_INET Stream 0
     setSocketOption sock ReuseAddr 1
     bindSocket sock (SockAddrInet 4242 iNADDR_ANY)
-    listen sock 10
+    listen sock 16
     forkIO (serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals isFailSet)
 
     -- start the REPL
-    putStrLn "Enter \"Deposit XX.XX\", \"Withdraw XX.XX\", \"Balance\", \"Fail\", \"Unfail\", or \"Quit\""
+    putStrLn "Enter \"Deposit XX.XX\", \"Withdraw XX.XX\", \"Balance\", \"Fail\", \"Unfail\", \"ViewLog\", \"Recover\", or \"Quit\""
     repl isFailSet myLog
