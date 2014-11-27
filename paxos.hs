@@ -143,16 +143,16 @@ repl isFailSet myLog = do
         _ -> putStrLn "Parse error; please check your input."
     repl isFailSet myLog
 
-serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet = do
+serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex isFailSet = do
     conn <- accept sock
     shouldIContinue <- liftM not $ readIORef isFailSet
     if shouldIContinue then do
-        forkIO (processConnection conn ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals)
+        forkIO (processConnection conn ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex)
         return ()
     else close (fst conn)
-    serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet
+    serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex isFailSet
 
-processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals = do
+processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex = do
     -- get the remote message
     hdl <- socketToHandle sock ReadWriteMode
     hSetBuffering hdl NoBuffering
@@ -174,7 +174,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
         -- process the message if it's valid
         case message of
             Just Blank -> return ()
-            Just m -> processMessage hdl2 m ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
+            Just m -> processMessage hdl2 m ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             _ -> do putStr $ "\n*** Invalid message received: " ++ line ++ " ***\n$> "
                     hFlush stdout
                     --hPutStrLn hdl2 "Error"
@@ -255,8 +255,8 @@ readLogInto myLog = do
 
 -}
 
-processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> IO ()
-processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals = do
+processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
+processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex = do
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     -- TODO: figure out where to reset the values & counters
@@ -273,13 +273,14 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             --sendToEveryoneButMe (Prepare currentLogLength newBallotNum)
             sendToEveryone (Prepare currentLogLength newBallotNum)
         Prepare logIndex bal -> do
+            takeMVar mutex
             currentLogLength <- liftM length $ readIORef myLog
             if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else if currentLogLength > logIndex then do
                 -- they don't know enough; send over our log
                 currentLog <- readIORef myLog
@@ -295,6 +296,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- send ack
                     hPutStrLn hdl $ show (Ack logIndex bal currentAcceptNum currentAcceptVal)
                 else return ()
+            putMVar mutex ()
         Ack logIndex ballot foreignAcceptNum foreignAcceptVal -> do
             currentLogLength <- liftM length $ readIORef myLog
             -- only accept this message if the log index is correct
@@ -339,7 +341,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else if currentLogLength > logIndex then return ()
             else do
                 currentBallotNum <- readIORef ballotNum
@@ -380,7 +382,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else do
                 -- we agree on the next index to update; update it
                 myValCurrent <- readIORef myVal
@@ -448,12 +450,14 @@ main = do
     isFailSet      <- newIORef False
     myValOriginal  <- newIORef Bottom
 
+    mutex <- newMVar ()
+
     -- set up the TCP server
     sock <- socket AF_INET Stream 0
     setSocketOption sock ReuseAddr 1
     bindSocket sock (SockAddrInet 4242 iNADDR_ANY)
     listen sock 16
-    forkIO (serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet)
+    forkIO (serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex isFailSet)
 
     -- start the REPL
     putStrLn "Enter \"Deposit XX.XX\", \"Withdraw XX.XX\", \"Balance\", \"Fail\", \"Unfail\", \"ViewLog\", \"Recover\", or \"Quit\""
