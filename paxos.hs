@@ -143,16 +143,16 @@ repl isFailSet myLog = do
         _ -> putStrLn "Parse error; please check your input."
     repl isFailSet myLog
 
-serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals isFailSet = do
+serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet = do
     conn <- accept sock
     shouldIContinue <- liftM not $ readIORef isFailSet
     if shouldIContinue then do
-        forkIO (processConnection conn ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals)
+        forkIO (processConnection conn ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals)
         return ()
     else close (fst conn)
-    serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals isFailSet
+    serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet
 
-processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals = do
+processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals = do
     -- get the remote message
     hdl <- socketToHandle sock ReadWriteMode
     hSetBuffering hdl NoBuffering
@@ -174,7 +174,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
         -- process the message if it's valid
         case message of
             Just Blank -> return ()
-            Just m -> processMessage hdl2 m ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals
+            Just m -> processMessage hdl2 m ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
             _ -> do putStr $ "\n*** Invalid message received: " ++ line ++ " ***\n$> "
                     hFlush stdout
                     --hPutStrLn hdl2 "Error"
@@ -255,8 +255,8 @@ readLogInto myLog = do
 
 -}
 
-processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> IO ()
-processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals = do
+processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> IO ()
+processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals = do
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     -- TODO: figure out where to reset the values & counters
@@ -265,6 +265,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             -- send prepare to everyone else & update myVal
             -- set my current value to this value
             atomicModifyIORef' myVal (\old -> (command, ()))
+            atomicModifyIORef' myValOriginal (\old -> (command, ()))
             -- increment my ballotNum
             newBallotNum <- atomicModifyIORef' ballotNum (\old -> (increment old, increment old))
             -- which log index do we want to update?
@@ -278,7 +279,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
             else if currentLogLength > logIndex then do
                 -- they don't know enough; send over our log
                 currentLog <- readIORef myLog
@@ -313,12 +314,13 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     putStrLnDebug "Got a majority of Acks"
                     if all (\(val,bal) -> val == Bottom) newReceivedVals then do
                         -- SUCCESS
-                        putStr "SUCCESS\n$> "
-                        hFlush stdout
+                        --putStr "SUCCESS\n$> "
+                        --hFlush stdout
+                        return ()
                     else do
                         -- FAILURE
-                        putStr "FAILURE\n$> "
-                        hFlush stdout
+                        --putStr "FAILURE\n$> "
+                        --hFlush stdout
                         -- change myVal
                         -- get val with max ballotNumber
                         let (maxVal, maxBal) = foldl (\(maxVal, maxBal) (val, bal) -> if bal > maxBal then (val, bal) else (maxVal, maxBal)) (Bottom, Ballot 0 [0,0,0,0]) newReceivedVals 
@@ -337,7 +339,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
             else if currentLogLength > logIndex then return ()
             else do
                 currentBallotNum <- readIORef ballotNum
@@ -378,13 +380,27 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals
             else do
                 -- we agree on the next index to update; update it
+                myValCurrent <- readIORef myVal
+                myValOriginalCurrent <- readIORef myValOriginal
+
+                if myValOriginalCurrent /= Bottom && myValOriginalCurrent == myValCurrent then do
+                    putStr "\nSUCCESS\n$> "
+                    hFlush stdout
+                else if myValOriginalCurrent /= Bottom && myValOriginalCurrent /= myValCurrent then do
+                    putStr "\nFAILURE\n$> "
+                    hFlush stdout
+                else return ()
+
+
                 atomicModifyIORef' myLog (\oldLog -> 
                     (oldLog ++ [cliCommand], ()))
                 saveLog myLog
                 -- reset everything
+                atomicModifyIORef' myVal (\old -> (Bottom, ()))
+                atomicModifyIORef' myValOriginal (\old -> (Bottom, ()))
                 atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 ip),()))
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
@@ -399,6 +415,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             if length currentLog < length l then do
                 -- reset everything (only once) 
                 -- TODO: is this necessary?
+                atomicModifyIORef' myVal (\old -> (Bottom, ()))
+                atomicModifyIORef' myValOriginal (\old -> (Bottom, ()))
                 atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 ip),()))
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
@@ -428,13 +446,14 @@ main = do
     ackCounter     <- newIORef 0 :: IO (IORef Int)
     acceptCounter  <- newIORef Map.empty :: IO (IORef (Map.Map (Ballot, CLICommand) Int))
     isFailSet      <- newIORef False
+    myValOriginal  <- newIORef Bottom
 
     -- set up the TCP server
     sock <- socket AF_INET Stream 0
     setSocketOption sock ReuseAddr 1
     bindSocket sock (SockAddrInet 4242 iNADDR_ANY)
     listen sock 16
-    forkIO (serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals isFailSet)
+    forkIO (serve sock ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals isFailSet)
 
     -- start the REPL
     putStrLn "Enter \"Deposit XX.XX\", \"Withdraw XX.XX\", \"Balance\", \"Fail\", \"Unfail\", \"ViewLog\", \"Recover\", or \"Quit\""
