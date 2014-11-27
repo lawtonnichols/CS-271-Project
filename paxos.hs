@@ -84,7 +84,7 @@ isWhiteSpace "" = True
 isWhiteSpace (x:xs) = (x == ' ' || x == '\t' || x == '\n')
                     && (isWhiteSpace xs)
 
-debug = True
+debug = False
 putStrLnDebug x = if debug then putStrLn x else return ()
 
 runCLICommand :: CLICommand -> IORef [CLICommand] -> IO ()
