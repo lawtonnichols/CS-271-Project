@@ -311,11 +311,11 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 if newAckCount == majority then do
                     if all (\(val,bal) -> val == Bottom) newReceivedVals then do
                         -- SUCCESS
-                        putStr "SUCCESS\n $> "
+                        putStr "SUCCESS\n$> "
                         hFlush stdout
                     else do
                         -- FAILURE
-                        putStr "FAILURE\n $> "
+                        putStr "FAILURE\n$> "
                         hFlush stdout
                         -- change myVal
                         -- get val with max ballotNumber
