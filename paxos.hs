@@ -73,6 +73,10 @@ data CLICommand = Deposit Double
                 | ViewLog
                 | Recover deriving (Show, Read, Eq, Ord)
 
+debug = True
+
+putStrLnDebug x = if debug then putStrLn x else return ()
+
 -- taken from http://stackoverflow.com/questions/10459988/how-do-i-catch-read-exceptions-in-haskell
 maybeRead :: Read a => String -> Maybe a
 maybeRead s = case reads s of
@@ -83,9 +87,6 @@ maybeRead s = case reads s of
 isWhiteSpace "" = True
 isWhiteSpace (x:xs) = (x == ' ' || x == '\t' || x == '\n')
                     && (isWhiteSpace xs)
-
-debug = False
-putStrLnDebug x = if debug then putStrLn x else return ()
 
 runCLICommand :: CLICommand -> IORef [CLICommand] -> IO ()
 runCLICommand command myLog = do
