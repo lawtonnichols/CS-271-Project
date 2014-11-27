@@ -11,6 +11,8 @@
     ssh -i lawton-singapore.pem ubuntu@54.169.171.162
     ssh -i lawton-tokyo.pem ubuntu@54.65.136.5
 
+    git clone https://github.com/lawtonnichols/CS-271-Project.git
+
 -}
 
 -- Some socket-handling code taken from https://www.haskell.org/haskellwiki/Implement_a_chat_server
@@ -29,7 +31,7 @@ import qualified Data.Map.Strict as Map
 
 majority :: Int
 majority = floor (numberOfSites / 2) + 1
-           where numberOfSites = length sites
+           where numberOfSites = fromIntegral $ length sites
 
 type IPAddress = [Int] 
 
