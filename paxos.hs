@@ -388,12 +388,13 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 myValCurrent <- readIORef myVal
                 myValOriginalCurrent <- readIORef myValOriginal
 
-                if myValOriginalCurrent /= Bottom && myValOriginalCurrent == myValCurrent then do
-                    putStr "\nSUCCESS\n$> "
-                    hFlush stdout
-                else if myValOriginalCurrent /= Bottom && myValOriginalCurrent /= myValCurrent then do
-                    putStr "\nFAILURE\n$> "
-                    hFlush stdout
+                if myValOriginalCurrent /= Bottom then do
+                    if myValOriginalCurrent == myValCurrent && myValOriginalCurrent == cliCommand then do
+                        putStr "\nSUCCESS\n$> "
+                        hFlush stdout
+                    else do
+                        putStr "\nFAILURE\n$> "
+                        hFlush stdout
                 else return ()
 
 
