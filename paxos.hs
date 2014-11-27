@@ -166,7 +166,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
         -- send replies back to the same host, but only on its server port
         let newAddr = SockAddrInet 4242 host
         newSock <- socket AF_INET Stream 0
-        putStrLnDebug $ "processConnection: connecting to " ++ (show host)
+        --putStrLnDebug $ "processConnection: connecting to " ++ (show host)
         connect newSock newAddr
         hdl2 <- socketToHandle newSock ReadWriteMode
         hSetBuffering hdl2 NoBuffering
@@ -257,7 +257,7 @@ readLogInto myLog = do
 
 processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> IO ()
 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal receivedVals = do
-    putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
+    --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     -- TODO: figure out where to reset the values & counters
     case message of 
@@ -310,6 +310,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 -- do this only once, so when it's exactly equal to a majority
                 -- TODO: Move the printing of SUCCESS/FAILURE to Accept
                 if newAckCount == majority then do
+                    putStrLnDebug "Got a majority of Acks"
                     if all (\(val,bal) -> val == Bottom) newReceivedVals then do
                         -- SUCCESS
                         putStr "SUCCESS\n$> "
