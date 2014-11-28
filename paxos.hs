@@ -332,7 +332,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- no matter what, we need to send accept to everyone in this case
                     currentMyVal <- readIORef myVal
                     --sendToEveryoneButMe (Accept logIndex ballot currentMyVal)
-                    sendToEveryone (Accept logIndex ballot currentMyVal)
+                    --sendToEveryone (Accept logIndex ballot currentMyVal)
+                    sendToMe (Accept logIndex ballot currentMyVal) -- this should cause it to be sent to everyone
                 else return ()
             else return ()
         Accept logIndex b cliCommand -> do
