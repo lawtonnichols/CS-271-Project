@@ -259,6 +259,7 @@ processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IO
 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex = do
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
+    takeMVar mutex
     -- TODO: figure out where to reset the values & counters
     case message of 
         TryToAdd command -> do
@@ -273,13 +274,13 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             --sendToEveryoneButMe (Prepare currentLogLength newBallotNum)
             sendToEveryone (Prepare currentLogLength newBallotNum)
         Prepare logIndex bal -> do
-            takeMVar mutex
             currentLogLength <- liftM length $ readIORef myLog
             if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
+                putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else if currentLogLength > logIndex then do
                 -- they don't know enough; send over our log
@@ -296,7 +297,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- send ack
                     hPutStrLn hdl $ show (Ack logIndex bal currentAcceptNum currentAcceptVal)
                 else return ()
-            putMVar mutex ()
         Ack logIndex ballot foreignAcceptNum foreignAcceptVal -> do
             currentLogLength <- liftM length $ readIORef myLog
             -- only accept this message if the log index is correct
@@ -335,7 +335,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 else return ()
             else return ()
         Accept logIndex b cliCommand -> do
-            takeMVar mutex
             currentLogLength <- liftM length $ readIORef myLog
             if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
@@ -373,7 +372,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     sendToEveryoneButMe (Decide logIndex cliCommand)
                     sendToMe (Decide logIndex cliCommand)
                 else return ()
-            putMVar mutex ()
         Decide logIndex cliCommand -> do
             -- we just decided on a value--update the next log entry
             -- make sure it's the right one
@@ -385,6 +383,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 sendToEveryoneButMe SendMeYourLog
                 threadDelay 200000 -- wait for .2 s
                 -- try again
+                putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else do
                 -- we agree on the next index to update; update it
@@ -436,6 +435,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     then (l, ()) 
                 else (oldLog, ()))
             saveLog myLog
+    putMVar mutex ()
 
 main :: IO ()
 main = do
