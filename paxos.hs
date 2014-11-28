@@ -158,7 +158,8 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
     hSetBuffering hdl NoBuffering
     line <- catch (hGetLine hdl) (\e -> let exc = (e :: SomeException) in return "")
     let message = if length line == 0 then Just Blank else maybeRead line :: Maybe NetworkMessage
-    putStrLnDebug $ "processConnection: got message " ++ (show message)
+    hostString <- inet_ntoa host
+    putStrLnDebug $ "processConnection: got message " ++ (show message) ++ " from " ++ hostString
     hClose hdl
 
     -- only continue if we didn't get a blank message
