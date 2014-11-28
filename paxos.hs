@@ -365,8 +365,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
                     -- send (Accept b cliCommand) to everyone (only the first time)
                     if newAcceptNum > oldAcceptNum then 
-                        --sendToEveryoneButMe (Accept logIndex b cliCommand)
-                        sendToEveryone (Accept logIndex b cliCommand)
+                        sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
                 else return ()
 
