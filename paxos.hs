@@ -261,6 +261,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     takeMVar mutex
+    putStrLn "******taking mutex"
     -- TODO: figure out where to reset the values & counters
     case message of 
         TryToAdd command -> do
@@ -437,6 +438,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     then (l, ()) 
                 else (oldLog, ()))
             saveLog myLog
+    putStrLn "******giving up mutex"
     putMVar mutex ()
 
 main :: IO ()
