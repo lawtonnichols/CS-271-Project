@@ -247,12 +247,12 @@ readLogInto myLog = do
     Possible way to handle multiple deposits
     ========================================
 
-    When you receive an Ack, instead of making sure all the values
-    are all Bottom, just make sure they're all either Deposit or 
-    Bottom. Change myVal to be a list of values, and send 
-    ("accept", BallotNum, [old deposit (if any), new deposit]). Now, 
-    when the values are accepted you can decide on both deposits at 
-    once, and their order in the log is unimportant.
+    Send an Accept even when b < BallotNum. When you receive 
+    an Accept, if the current AcceptVal is bottom or a Deposit, 
+    then send Accept for this value too. That way, two deposits 
+    can be decided at once and multiple Decide messages will be 
+    sent out, and the order that they are received and put in 
+    the log doesn't matter.
 
 -}
 
@@ -261,7 +261,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     takeMVar mutex
-    putStrLn "******taking mutex"
     -- TODO: figure out where to reset the values & counters
     case message of 
         TryToAdd command -> do
@@ -437,7 +436,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     then (l, ()) 
                 else (oldLog, ()))
             saveLog myLog
-    putStrLn "******giving up mutex"
     putMVar mutex ()
 
 main :: IO ()
