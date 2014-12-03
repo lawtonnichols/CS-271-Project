@@ -378,6 +378,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit
                 else if modifiedPaxos && b < currentBallotNum && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) then do
                     -- we should only send this out the first time we receive it; that is if this is coming straight from the sender
+                    -- TODO: check this logic
                     currentMyVal <- readIORef myVal
                     if currentMyVal /= cliCommand then
                         hPutStrLn hdl $ show (Accept logIndex b cliCommand)
@@ -393,16 +394,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             -- we just decided on a value--update the next log entry
             -- make sure it's the right one
             currentLogLength <- liftM length $ readIORef myLog
-            if currentLogLength > logIndex then
-                return () -- do nothing; we know more
-            else if currentLogLength < logIndex then do
-                -- we don't know enough; get everyone else's log & try again
-                sendToEveryoneButMe SendMeYourLog
-                threadDelay 200000 -- wait for .2 s
-                -- try again
-                putMVar mutex ()
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
-            else do
+            modifiedPaxos <- areWeUsingModifiedPaxos
+            if currentLogLength == logIndex || (modifiedPaxos && currentLogLength - 1 == logIndex) then do
                 -- we agree on the next index to update; update it
                 myValCurrent <- readIORef myVal
                 myValOriginalCurrent <- readIORef myValOriginal
@@ -416,9 +409,16 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                         hFlush stdout
                 else return ()
 
-                -- TODO: differentiate between the cases here
-                atomicModifyIORef' myLog (\oldLog -> 
-                    (oldLog ++ [[cliCommand]], ()))
+                if currentLogLength == logIndex then
+                    atomicModifyIORef' myLog (\oldLog -> 
+                        (oldLog ++ [[cliCommand]], ()))
+                else do
+                    oldLog <- readIORef myLog
+                    let allButLast = init oldLog
+                    let lastElement = last oldLog
+                    let newLastElement = lastElement ++ [cliCommand]
+                    atomicModifyIORef' myLog (\oldLog -> 
+                        (allButLast ++ [newLastElement], ()))
                 saveLog myLog
                 -- reset everything
                 atomicModifyIORef' myVal (\old -> (Bottom, ()))
@@ -428,6 +428,15 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
                 atomicModifyIORef' ackCounter (\old -> (0, ()))
                 -- TODO: do I need to update the acceptCounter?
+            else if currentLogLength < logIndex then do
+                -- we don't know enough; get everyone else's log & try again
+                sendToEveryoneButMe SendMeYourLog
+                threadDelay 200000 -- wait for .2 s
+                -- try again
+                putMVar mutex ()
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
+            else
+                return () -- do nothing; we know more
         SendMeYourLog -> do
             -- get the contents of my log and send it
             l <- readIORef myLog
