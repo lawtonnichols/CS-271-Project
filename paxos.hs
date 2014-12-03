@@ -77,6 +77,13 @@ debug = True
 
 putStrLnDebug x = if debug then putStrLn x else return ()
 
+areWeUsingModifiedPaxos :: IO Bool
+areWeUsingModifiedPaxos = do
+    args <- getArgs
+    if "modified" `elem` args then
+        return True
+    else return False
+
 -- taken from http://stackoverflow.com/questions/10459988/how-do-i-catch-read-exceptions-in-haskell
 maybeRead :: Read a => String -> Maybe a
 maybeRead s = case reads s of
@@ -354,6 +361,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                                                                           Nothing -> (Map.insert (b, cliCommand)     1 old, 1)
                                                                           Just n  -> (Map.insert (b, cliCommand) (n+1) old, n+1))
                 currentAcceptCounter <- readIORef acceptCounter
+                currentAcceptVal <- readIORef acceptVal
+                modifiedPaxos <- areWeUsingModifiedPaxos
 
                 if b >= currentBallotNum then do
                     -- change my ballotNum so that we don't keep sending out accepts
@@ -365,6 +374,13 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- send (Accept b cliCommand) to everyone (only the first time)
                     if newAcceptNum > oldAcceptNum then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
+                    else return ()
+                -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit
+                else if modifiedPaxos && b < currentBallotNum && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) then do
+                    -- we should only send this out the first time we receive it; that is if this is coming straight from the sender
+                    currentMyVal <- readIORef myVal
+                    if currentMyVal /= cliCommand then
+                        hPutStrLn hdl $ show (Accept logIndex b cliCommand)
                     else return ()
                 else return ()
 
