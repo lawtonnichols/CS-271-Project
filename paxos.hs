@@ -59,7 +59,7 @@ data NetworkMessage = Prepare LogIndex Ballot
                     | Accept LogIndex Ballot CLICommand
                     | Decide LogIndex CLICommand
                     | SendMeYourLog 
-                    | MyLogIs [CLICommand] 
+                    | MyLogIs [[CLICommand]]
                     | TryToAdd CLICommand 
                     | Blank deriving (Show, Read, Eq)
 
@@ -88,11 +88,11 @@ isWhiteSpace "" = True
 isWhiteSpace (x:xs) = (x == ' ' || x == '\t' || x == '\n')
                     && (isWhiteSpace xs)
 
-runCLICommand :: CLICommand -> IORef [CLICommand] -> IO ()
+runCLICommand :: CLICommand -> IORef [[CLICommand]] -> IO ()
 runCLICommand command myLog = do
     -- if this is a withdrawal, make sure we can do this
     currentLog <- readIORef myLog
-    let balance = getBalance currentLog
+    let balance = getBalance (concat currentLog)
     let isItOkayToContinue = case command of 
                                (Withdraw amt) -> if balance - amt >= 0.0 then True else False
                                _              -> True
@@ -126,7 +126,7 @@ getBalance (l:ls) = case l of
                       _            -> getBalance ls
 getBalance [] = 0.0
 
-repl :: IORef Bool -> IORef [CLICommand] -> IO ()
+repl :: IORef Bool -> IORef [[CLICommand]] -> IO ()
 repl isFailSet myLog = do
     putStr "$> "
     hFlush stdout
@@ -136,7 +136,7 @@ repl isFailSet myLog = do
         Just Quit -> exitSuccess
         Just Fail -> atomicModifyIORef' isFailSet (\_ -> (True, ()))
         Just Unfail -> atomicModifyIORef' isFailSet (\_ -> (False, ()))
-        Just Balance -> do {l <- readIORef myLog; putStrLn $ "Balance: " ++ (show $ getBalance l); hFlush stdout;}
+        Just Balance -> do {l <- readIORef myLog; putStrLn $ "Balance: " ++ (show $ getBalance (concat l)); hFlush stdout;}
         Just ViewLog -> do {l <- readIORef myLog; putStrLn $ "Current Log: " ++ (show l); hFlush stdout;}
         Just Recover -> readLogInto myLog
         Just c -> runCLICommand c myLog
@@ -231,15 +231,15 @@ sendMessage m host = do
     
     
 
-saveLog :: IORef [CLICommand] -> IO ()
+saveLog :: IORef [[CLICommand]] -> IO ()
 saveLog myLog = do
     l <- readIORef myLog
     writeFile "myLog.log" (show l)
 
-readLogInto :: IORef [CLICommand] -> IO ()
+readLogInto :: IORef [[CLICommand]] -> IO ()
 readLogInto myLog = do
     l <- readFile "myLog.log"
-    let newMyLog = read l :: [CLICommand]
+    let newMyLog = read l :: [[CLICommand]]
     atomicModifyIORef' myLog (\old -> (newMyLog,()))
 
 {- 
@@ -256,7 +256,7 @@ readLogInto myLog = do
 
 -}
 
-processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [CLICommand] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
+processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [[CLICommand]] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex = do
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
@@ -400,9 +400,9 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                         hFlush stdout
                 else return ()
 
-
+                -- TODO: differentiate between the cases here
                 atomicModifyIORef' myLog (\oldLog -> 
-                    (oldLog ++ [cliCommand], ()))
+                    (oldLog ++ [[cliCommand]], ()))
                 saveLog myLog
                 -- reset everything
                 atomicModifyIORef' myVal (\old -> (Bottom, ()))
@@ -447,7 +447,7 @@ main = do
     ballotNum <- newIORef (Ballot 0 myAddr)
     acceptNum <- newIORef (Ballot 0 [0,0,0,0])
     acceptVal <- newIORef Bottom
-    myLog     <- newIORef [] :: IO (IORef [CLICommand])
+    myLog     <- newIORef [] :: IO (IORef [[CLICommand]])
     myVal     <- newIORef Bottom
     receivedVals   <- newIORef [] :: IO (IORef [(CLICommand, Ballot)])
     ackCounter     <- newIORef 0 :: IO (IORef Int)
