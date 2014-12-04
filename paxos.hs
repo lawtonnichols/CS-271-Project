@@ -417,8 +417,10 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     let allButLast = init oldLog
                     let lastElement = last oldLog
                     let newLastElement = lastElement ++ [cliCommand]
-                    atomicModifyIORef' myLog (\oldLog -> 
-                        (allButLast ++ [newLastElement], ()))
+                    if not (cliCommand `elem` lastElement) then
+                        atomicModifyIORef' myLog (\oldLog -> 
+                            (allButLast ++ [newLastElement], ()))
+                    else return ()
                 saveLog myLog
                 -- reset everything
                 atomicModifyIORef' myVal (\old -> (Bottom, ()))
