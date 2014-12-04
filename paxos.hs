@@ -196,7 +196,6 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
 increment :: Ballot -> Ballot
 increment (Ballot num processID) = (Ballot (num+1) processID)
 
--- TODO: make this actually work
 myAddress :: IO IPAddress
 myAddress = do
     args <- getArgs
@@ -265,6 +264,16 @@ readLogInto myLog = do
     multiple Decide messages will be sent out, and the order 
     that they are received and put in the log doesn't matter.
 
+    For this to work, any leader who wants to make a deposit 
+    can skip directly to the Accept phase and immediately send
+    out Accept because the ballot numbers for Deposits don't 
+    matter. Withdrawals must still go through the Prepare and
+    Ack process, though. The result is that modified Paxos 
+    tends to favor Deposits because they can be accepted so 
+    quickly, so whenever a Withdrawal and a Deposit compete for
+    a log index, it will almost always be the Deposit that 
+    wins.
+
 -}
 
 processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map ((Int, Ballot), CLICommand) Int) -> IORef [[CLICommand]] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
@@ -272,7 +281,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
     takeMVar mutex
-    -- TODO: figure out where to reset the values & counters
     case message of 
         TryToAdd command -> do
             -- send prepare to everyone else & update myVal
@@ -332,7 +340,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 --putStrLn $ "majority: " ++ (show majority)
 
                 -- do this only once, so when it's exactly equal to a majority
-                -- TODO: Move the printing of SUCCESS/FAILURE to Accept
                 if newAckCount == majority then do
                     putStrLnDebug "Got a majority of Acks"
                     if all (\(val,bal) -> val == Bottom) newReceivedVals then do
