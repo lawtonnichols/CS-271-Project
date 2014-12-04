@@ -263,7 +263,7 @@ readLogInto myLog = do
 
 -}
 
-processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map (Ballot, CLICommand) Int) -> IORef [[CLICommand]] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
+processMessage :: Handle -> NetworkMessage -> IORef Ballot -> IORef Ballot -> IORef CLICommand ->  IORef Int -> IORef (Map.Map ((Int, Ballot), CLICommand) Int) -> IORef [[CLICommand]] -> IORef CLICommand -> IORef CLICommand -> IORef [(CLICommand, Ballot)] -> MVar () -> IO ()
 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex = do
     --putStrLnDebug $ "*** received " ++ (show message) ++ " ***"
     hFlush stdout
@@ -356,11 +356,11 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             else do
                 currentBallotNum <- readIORef ballotNum
                 -- increment this accept count
-                newCount <- atomicModifyIORef' acceptCounter (\old -> let x = Map.lookup (b, cliCommand) old
+                newCount <- atomicModifyIORef' acceptCounter (\old -> let x = Map.lookup ((logIndex, b), cliCommand) old
                                                                         in case x of 
-                                                                          Nothing -> (Map.insert (b, cliCommand)     1 old, 1)
-                                                                          Just n  -> (Map.insert (b, cliCommand) (n+1) old, n+1))
-                currentAcceptCounter <- readIORef acceptCounter
+                                                                          Nothing -> (Map.insert ((logIndex, b), cliCommand)     1 old, 1)
+                                                                          Just n  -> (Map.insert ((logIndex, b), cliCommand) (n+1) old, n+1))
+                --currentAcceptCounter <- readIORef acceptCounter
                 currentAcceptVal <- readIORef acceptVal
                 modifiedPaxos <- areWeUsingModifiedPaxos
 
@@ -476,7 +476,7 @@ main = do
     myVal     <- newIORef Bottom
     receivedVals   <- newIORef [] :: IO (IORef [(CLICommand, Ballot)])
     ackCounter     <- newIORef 0 :: IO (IORef Int)
-    acceptCounter  <- newIORef Map.empty :: IO (IORef (Map.Map (Ballot, CLICommand) Int))
+    acceptCounter  <- newIORef Map.empty :: IO (IORef (Map.Map ((Int, Ballot), CLICommand) Int))
     isFailSet      <- newIORef False
     myValOriginal  <- newIORef Bottom
 
