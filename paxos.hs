@@ -284,7 +284,16 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             -- which log index do we want to update?
             currentLogLength <- liftM length $ readIORef myLog
             --sendToEveryoneButMe (Prepare currentLogLength newBallotNum)
-            sendToEveryone (Prepare currentLogLength newBallotNum)
+
+            modifiedPaxos <- areWeUsingModifiedPaxos
+            if modifiedPaxos then
+                -- if it's a deposit we should go straight to accept
+                if case command of Deposit _ -> True; _ -> False then
+                    sendToEveryone (Accept currentLogLength newBallotNum command)    
+                else
+                    sendToEveryone (Prepare currentLogLength newBallotNum)    
+            else
+                sendToEveryone (Prepare currentLogLength newBallotNum)
         Prepare logIndex bal -> do
             currentLogLength <- liftM length $ readIORef myLog
             if currentLogLength < logIndex then do
