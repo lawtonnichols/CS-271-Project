@@ -133,6 +133,10 @@ getBalance (l:ls) = case l of
                       _            -> getBalance ls
 getBalance [] = 0.0
 
+showLog :: [[CLICommand]] -> String
+showLog (l:ls)  = (show l) ++ "\n" ++ showLog ls
+showLog [] = ""
+
 repl :: IORef Bool -> IORef [[CLICommand]] -> IO ()
 repl isFailSet myLog = do
     putStr "$> "
@@ -144,7 +148,7 @@ repl isFailSet myLog = do
         Just Fail -> atomicModifyIORef' isFailSet (\_ -> (True, ()))
         Just Unfail -> atomicModifyIORef' isFailSet (\_ -> (False, ()))
         Just Balance -> do {l <- readIORef myLog; putStrLn $ "Balance: " ++ (show $ getBalance (concat l)); hFlush stdout;}
-        Just ViewLog -> do {l <- readIORef myLog; putStrLn $ "Current Log: " ++ (show l); hFlush stdout;}
+        Just ViewLog -> do {l <- readIORef myLog; putStrLn $ "Current Log: " ++ (showLog l); hFlush stdout;}
         Just Recover -> readLogInto myLog
         Just c -> runCLICommand c myLog
         _ -> putStrLn "Parse error; please check your input."
