@@ -256,10 +256,10 @@ readLogInto myLog = do
 
     Send an Accept even when b < BallotNum. When you receive 
     an Accept, if the current AcceptVal is bottom or a Deposit, 
-    then send Accept for this value too. That way, two deposits 
-    can be decided at once and multiple Decide messages will be 
-    sent out, and the order that they are received and put in 
-    the log doesn't matter.
+    then send Accept for this value too (as long as it is a 
+    Deposit). That way, two deposits can be decided at once and 
+    multiple Decide messages will be sent out, and the order 
+    that they are received and put in the log doesn't matter.
 
 -}
 
@@ -375,8 +375,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     if newAcceptNum > oldAcceptNum then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
-                -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit
-                else if modifiedPaxos && b < currentBallotNum && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) then do
+                -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
+                else if modifiedPaxos && b < currentBallotNum && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) && (case cliCommand of Deposit _ -> True; _ -> False) then do
                     -- we should only send this out the first time we receive it; that is if this is coming straight from the sender
                     -- TODO: check this logic
                     currentMyVal <- readIORef myVal
