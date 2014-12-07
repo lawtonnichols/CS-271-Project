@@ -444,6 +444,9 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     if myValOriginalCurrent == myValCurrent && myValOriginalCurrent == cliCommand then do
                         putStr "\nSUCCESS\n$> "
                         hFlush stdout
+                    else if modifiedPaxos && case myValOriginalCurrent of Deposit _ -> True; _ -> False then do
+                        putStr "\nMODIFIED PAXOS: CHECK LOG FOR SUCCESS/FAILURE\n$> "
+                        hFlush stdout
                     else do
                         putStr "\nFAILURE\n$> "
                         hFlush stdout
