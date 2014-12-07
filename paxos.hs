@@ -297,7 +297,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             -- which log index do we want to update?
             currentLogLength <- liftM length $ readIORef myLog
             -- don't go through with this if we've already changed our BallotNum
-            let wasThereAnIssue = (ballotProcessID oldBallotNum /= [0,0,0,0])
+            let wasThereAnIssue = case oldBallotNum of Ballot num ip -> if num == 0 && ip /= [0,0,0,0] then True else False
 
             modifiedPaxos <- areWeUsingModifiedPaxos
             if modifiedPaxos then
@@ -400,11 +400,12 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- change my ballotNum so that we don't keep sending out accepts
                     atomicModifyIORef' ballotNum (\(Ballot myN myIP) -> let (Ballot n ip) = b in ((Ballot (n+1) myIP), ()))
 
+                    oldAcceptVal <- readIORef acceptVal
                     oldAcceptNum <- readIORef acceptNum 
                     newAcceptNum <- atomicModifyIORef' acceptNum (\old -> (b, b))
                     atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
                     -- send (Accept b cliCommand) to everyone (only the first time)
-                    if newAcceptNum > oldAcceptNum then 
+                    if newAcceptNum > oldAcceptNum || oldAcceptVal /= cliCommand then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
