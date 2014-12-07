@@ -379,15 +379,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             else return ()
         Accept logIndex b cliCommand -> do
             currentLogLength <- liftM length $ readIORef myLog
-            if currentLogLength < logIndex then do
-                -- we don't know enough; get everyone else's log & try again
-                sendToEveryoneButMe SendMeYourLog
-                threadDelay 200000 -- wait for .2 s
-                -- try again
-                putMVar mutex ()
-                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
-            else if currentLogLength > logIndex then return ()
-            else do
+            modifiedPaxos <- areWeUsingModifiedPaxos
+            if currentLogLength == logIndex || (modifiedPaxos && currentLogLength - 1 == logIndex) then do
                 currentBallotNum <- readIORef ballotNum
                 -- increment this accept count
                 newCount <- atomicModifyIORef' acceptCounter (\old -> let x = Map.lookup ((logIndex, b), cliCommand) old
@@ -396,7 +389,6 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                                                                           Just n  -> (Map.insert ((logIndex, b), cliCommand) (n+1) old, n+1))
                 --currentAcceptCounter <- readIORef acceptCounter
                 currentAcceptVal <- readIORef acceptVal
-                modifiedPaxos <- areWeUsingModifiedPaxos
 
                 putStrLnDebug "inside Accept"
                 putStrLnDebug $ "current ballot: " ++ (show currentBallotNum)
@@ -432,6 +424,14 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     sendToEveryoneButMe (Decide logIndex cliCommand)
                     sendToMe (Decide logIndex cliCommand)
                 else return ()
+            else if currentLogLength < logIndex then do
+                -- we don't know enough; get everyone else's log & try again
+                sendToEveryoneButMe SendMeYourLog
+                threadDelay 200000 -- wait for .2 s
+                -- try again
+                putMVar mutex ()
+                processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
+            else return ()
         Decide logIndex cliCommand -> do
             -- we just decided on a value--update the next log entry
             -- make sure it's the right one
