@@ -420,6 +420,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 else if modifiedPaxos && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) && (case cliCommand of Deposit _ -> True; _ -> False) then do
                     -- we should only send this out the first time we receive it; that is if this is coming straight from the sender
                     -- TODO: check this logic
+                    putStrLnDebug "got here"
                     currentMyValOriginal <- readIORef myValOriginal
                     if currentMyValOriginal /= cliCommand then
                         hPutStrLn hdl $ show (Accept logIndex b cliCommand)
