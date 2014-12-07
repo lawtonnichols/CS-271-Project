@@ -73,7 +73,7 @@ data CLICommand = Deposit Double
                 | ViewLog
                 | Recover deriving (Show, Read, Eq, Ord)
 
-debug = True
+debug = False
 
 putStrLnDebug x = if debug then putStrLn x else return ()
 
