@@ -414,7 +414,8 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- TODO: check this logic
                     putStrLnDebug "got here"
                     currentMyValOriginal <- readIORef myValOriginal
-                    if currentMyValOriginal /= cliCommand then
+                    if currentMyValOriginal /= cliCommand then do
+                        putStrLnDebug "sending Accept back to the sender"
                         hPutStrLn hdl $ show (Accept logIndex b cliCommand)
                     else return ()
                 else return ()
