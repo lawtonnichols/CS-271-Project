@@ -405,7 +405,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     newAcceptNum <- atomicModifyIORef' acceptNum (\old -> (b, b))
                     atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
                     -- send (Accept b cliCommand) to everyone (only the first time)
-                    if newAcceptNum > oldAcceptNum || oldAcceptVal /= cliCommand then 
+                    if newCount == 1 then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
