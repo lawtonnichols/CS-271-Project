@@ -84,6 +84,9 @@ areWeUsingModifiedPaxos = do
         return True
     else return False
 
+ballotProcessID :: Ballot -> IPAddress
+ballotProcessID (Ballot _ ip) = ip
+
 -- taken from http://stackoverflow.com/questions/10459988/how-do-i-catch-read-exceptions-in-haskell
 maybeRead :: Read a => String -> Maybe a
 maybeRead s = case reads s of
@@ -289,9 +292,12 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             atomicModifyIORef' myValOriginal (\old -> (command, ()))
             -- increment my ballotNum
             myAddr <- myAddress
+            oldBallotNum <- readIORef ballotNum
             newBallotNum <- atomicModifyIORef' ballotNum (\old -> (increment old myAddr, increment old myAddr))
             -- which log index do we want to update?
             currentLogLength <- liftM length $ readIORef myLog
+            -- don't go through with this if we've already changed our BallotNum
+            let wasThereAnIssue = (ballotProcessID oldBallotNum /= [0,0,0,0])
 
             modifiedPaxos <- areWeUsingModifiedPaxos
             if modifiedPaxos then
@@ -299,9 +305,15 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 if case command of Deposit _ -> True; _ -> False then
                     sendToEveryone (Accept currentLogLength newBallotNum command)    
                 else
-                    sendToEveryone (Prepare currentLogLength newBallotNum)    
+                    if wasThereAnIssue then
+                        return ()
+                    else 
+                        sendToEveryone (Prepare currentLogLength newBallotNum)    
             else
-                sendToEveryone (Prepare currentLogLength newBallotNum)
+                if wasThereAnIssue then
+                    return ()
+                else
+                    sendToEveryone (Prepare currentLogLength newBallotNum)
         Prepare logIndex bal -> do
             currentLogLength <- liftM length $ readIORef myLog
             if currentLogLength < logIndex then do
