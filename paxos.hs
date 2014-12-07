@@ -297,7 +297,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             -- which log index do we want to update?
             currentLogLength <- liftM length $ readIORef myLog
             -- don't go through with this if we've already changed our BallotNum
-            let wasThereAnIssue = case oldBallotNum of Ballot num ip -> if num == 0 && ip /= [0,0,0,0] then True else False
+            let wasThereAnIssue = case oldBallotNum of Ballot num ip -> if num == 1 then True else False
 
             modifiedPaxos <- areWeUsingModifiedPaxos
             if modifiedPaxos then
