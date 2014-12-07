@@ -380,7 +380,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
         Accept logIndex b cliCommand -> do
             currentLogLength <- liftM length $ readIORef myLog
             modifiedPaxos <- areWeUsingModifiedPaxos
-            if currentLogLength == logIndex || (modifiedPaxos && currentLogLength - 1 == logIndex) then do
+            if currentLogLength == logIndex {-|| (modifiedPaxos && currentLogLength - 1 == logIndex)-} then do
                 currentBallotNum <- readIORef ballotNum
                 -- increment this accept count
                 newCount <- atomicModifyIORef' acceptCounter (\old -> let x = Map.lookup ((logIndex, b), cliCommand) old
