@@ -22,3 +22,9 @@
 paxos
 
 paxos modified.hs
+
+*.aux
+
+*.log
+
+*.gz
