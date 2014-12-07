@@ -194,7 +194,7 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
     else return ()
 
 increment :: Ballot -> Ballot
-increment (Ballot num processID) = (Ballot (num+1) processID)
+increment (Ballot num processID) = (Ballot (num+1) myAddress)
 
 myAddress :: IO IPAddress
 myAddress = do
@@ -392,7 +392,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     newAcceptNum <- atomicModifyIORef' acceptNum (\old -> (b, b))
                     atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
                     -- send (Accept b cliCommand) to everyone (only the first time)
-                    if newAcceptNum > oldAcceptNum || currentAcceptVal /= cliCommand then 
+                    if newAcceptNum > oldAcceptNum then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
@@ -445,7 +445,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 -- reset everything
                 atomicModifyIORef' myVal (\old -> (Bottom, ()))
                 atomicModifyIORef' myValOriginal (\old -> (Bottom, ()))
-                atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 ip),()))
+                atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
                 atomicModifyIORef' ackCounter (\old -> (0, ()))
@@ -470,7 +470,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 -- TODO: is this necessary?
                 atomicModifyIORef' myVal (\old -> (Bottom, ()))
                 atomicModifyIORef' myValOriginal (\old -> (Bottom, ()))
-                atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 ip),()))
+                atomicModifyIORef' ballotNum (\(Ballot oldN ip) -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
                 atomicModifyIORef' ackCounter (\old -> (0, ()))
@@ -491,7 +491,7 @@ main = do
     myAddr <- myAddress
 
     -- initialize shared variables
-    ballotNum <- newIORef (Ballot 0 myAddr)
+    ballotNum <- newIORef (Ballot 0 [0,0,0,0])
     acceptNum <- newIORef (Ballot 0 [0,0,0,0])
     acceptVal <- newIORef Bottom
     myLog     <- newIORef [] :: IO (IORef [[CLICommand]])
