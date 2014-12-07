@@ -306,12 +306,14 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     sendToEveryone (Accept currentLogLength newBallotNum command)    
                 else
                     if wasThereAnIssue then
-                        return ()
+                        -- reset ballotNum
+                        atomicModifyIORef' ballotNum (\old -> (oldBallotNum, ()))
                     else 
                         sendToEveryone (Prepare currentLogLength newBallotNum)    
             else
                 if wasThereAnIssue then
-                    return ()
+                    -- reset ballotNum
+                    atomicModifyIORef' ballotNum (\old -> (oldBallotNum, ()))
                 else
                     sendToEveryone (Prepare currentLogLength newBallotNum)
         Prepare logIndex bal -> do
