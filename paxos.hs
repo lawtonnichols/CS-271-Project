@@ -398,7 +398,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
 
                 if b >= currentBallotNum then do
                     -- change my ballotNum so that we don't keep sending out accepts
-                    atomicModifyIORef' ballotNum (\(Ballot myN myIP) -> let (Ballot n ip) = b in ((Ballot (n+1) myIP), ()))
+                    --atomicModifyIORef' ballotNum (\(Ballot myN myIP) -> let (Ballot n ip) = b in ((Ballot (n+1) myIP), ()))
 
                     oldAcceptVal <- readIORef acceptVal
                     oldAcceptNum <- readIORef acceptNum 
