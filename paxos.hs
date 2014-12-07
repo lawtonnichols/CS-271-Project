@@ -193,8 +193,8 @@ processConnection (sock, SockAddrInet port host) ballotNum acceptNum acceptVal a
         hClose hdl2
     else return ()
 
-increment :: Ballot -> Ballot
-increment (Ballot num processID) = (Ballot (num+1) myAddress)
+increment :: Ballot -> IPAddress -> Ballot
+increment (Ballot num processID) ip = (Ballot (num+1) ip)
 
 myAddress :: IO IPAddress
 myAddress = do
@@ -288,10 +288,10 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             atomicModifyIORef' myVal (\old -> (command, ()))
             atomicModifyIORef' myValOriginal (\old -> (command, ()))
             -- increment my ballotNum
-            newBallotNum <- atomicModifyIORef' ballotNum (\old -> (increment old, increment old))
+            myAddr <- myAddress
+            newBallotNum <- atomicModifyIORef' ballotNum (\old -> (increment old myAddr, increment old myAddr))
             -- which log index do we want to update?
             currentLogLength <- liftM length $ readIORef myLog
-            --sendToEveryoneButMe (Prepare currentLogLength newBallotNum)
 
             modifiedPaxos <- areWeUsingModifiedPaxos
             if modifiedPaxos then
