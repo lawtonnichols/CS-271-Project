@@ -303,7 +303,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             if modifiedPaxos then
                 -- if it's a deposit we should go straight to accept
                 if case command of Deposit _ -> True; _ -> False then
-                    sendToMe (Accept currentLogLength newBallotNum command)    
+                    sendToEveryone (Accept currentLogLength newBallotNum command)    
                 else
                     if wasThereAnIssue then
                         -- reset ballotNum
@@ -403,7 +403,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 putStrLnDebug $ "b: " ++ (show b)
                 putStrLnDebug $ "newCount: " ++ (show newCount)
 
-                if b >= currentBallotNum then do
+                if b >= currentBallotNum && (not modifiedPaxos || case cliCommand of Withdraw _ -> True; _ -> False) then do
                     -- change my ballotNum so that we don't keep sending out accepts
                     --atomicModifyIORef' ballotNum (\(Ballot myN myIP) -> let (Ballot n ip) = b in ((Ballot (n+1) myIP), ()))
 
@@ -417,7 +417,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
                     else return ()
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
-                else if modifiedPaxos && b < currentBallotNum && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) && (case cliCommand of Deposit _ -> True; _ -> False) then do
+                else if modifiedPaxos && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) && (case cliCommand of Deposit _ -> True; _ -> False) then do
                     -- we should only send this out the first time we receive it; that is if this is coming straight from the sender
                     -- TODO: check this logic
                     currentMyValOriginal <- readIORef myValOriginal
