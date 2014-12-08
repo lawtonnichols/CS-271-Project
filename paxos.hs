@@ -444,7 +444,10 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 -- try again
                 putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
-            else return ()
+            else do
+                -- send over my log
+                currentLog <- readIORef myLog
+                hPutStrLn hdl $ show (MyLogIs currentLog)
         Decide logIndex cliCommand -> do
             -- we just decided on a value--update the next log entry
             -- make sure it's the right one
