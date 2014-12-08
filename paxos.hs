@@ -16,6 +16,9 @@
 
 -- Some socket-handling code taken from https://www.haskell.org/haskellwiki/Implement_a_chat_server
 
+-- I apologize for the messy code in some parts; I found a serious issue with my modified Paxos
+-- Sunday night and I had to rush to fix it.
+
 import System.IO
 import System.Exit
 import System.Environment
@@ -66,7 +69,7 @@ data CLICommand = Deposit Double
                 | ViewLog
                 | Recover deriving (Show, Read, Eq, Ord)
 
-debug = True
+debug = False
 
 putStrLnDebug x = if debug then putStrLn x else return ()
 
@@ -314,9 +317,9 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
                 sendToEveryoneButMe SendMeYourLog
+                putMVar mutex ()
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else if currentLogLength > logIndex then do
                 -- they don't know enough; send over our log
@@ -433,9 +436,9 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             else if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
                 sendToEveryoneButMe SendMeYourLog
+                putMVar mutex ()
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else do
                 -- send over my log
@@ -488,9 +491,9 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
             else if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
                 sendToEveryoneButMe SendMeYourLog
+                putMVar mutex ()
                 threadDelay 200000 -- wait for .2 s
                 -- try again
-                putMVar mutex ()
                 processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounter myLog myVal myValOriginal receivedVals mutex
             else
                 return () -- do nothing; we know more
