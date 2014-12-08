@@ -390,10 +390,10 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 --currentAcceptCounter <- readIORef acceptCounter
                 currentAcceptVal <- readIORef acceptVal
 
-                putStrLnDebug "inside Accept"
+                {-putStrLnDebug "inside Accept"
                 putStrLnDebug $ "current ballot: " ++ (show currentBallotNum)
                 putStrLnDebug $ "b: " ++ (show b)
-                putStrLnDebug $ "newCount: " ++ (show newCount)
+                putStrLnDebug $ "newCount: " ++ (show newCount)-}
 
                 if b >= currentBallotNum && (not modifiedPaxos || case cliCommand of Withdraw _ -> True; _ -> False) then do
                     -- change my ballotNum so that we don't keep sending out accepts
@@ -414,6 +414,12 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     -- TODO: check this logic
                     putStrLnDebug "got here"
                     currentMyValOriginal <- readIORef myValOriginal
+
+                    if (b >= currentBallotNum) then do
+                        newAcceptNum <- atomicModifyIORef' acceptNum (\old -> (b, b))
+                        atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
+                    else return ()
+
                     if currentMyValOriginal /= cliCommand then do
                         putStrLnDebug "sending Accept back to the sender"
                         hPutStrLn hdl $ show (Accept logIndex b cliCommand)
