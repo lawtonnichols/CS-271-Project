@@ -405,8 +405,14 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                     atomicModifyIORef' acceptVal (\old -> (cliCommand, ()))
                     -- send (Accept b cliCommand) to everyone (only the first time)
                     -- if we're in modified paxos, don't resend out Accept if this is a Deposit
-                    if newCount == 1 then 
+                    if newCount == 1 && (not modifiedPaxos || (modifiedPaxos && case oldAcceptVal of Deposit _ -> False; _ -> True)) then 
                         sendToEveryoneButMe (Accept logIndex b cliCommand) -- I should have already received an Accept; I don't need another
+                    else return ()
+
+                    -- reset if we accidentally updated these
+                    if (modifiedPaxos && case oldAcceptVal of Deposit _ -> True; _ -> False) then do
+                        atomicModifyIORef' acceptNum (\old -> (oldAcceptNum, ()))
+                        atomicModifyIORef' acceptVal (\old -> (oldAcceptVal, ()))
                     else return ()
                 -- if this is modified Paxos, then we can send out Accept if our currentAcceptVal is either Bottom or a Deposit and cliCommand is Deposit
                 else if modifiedPaxos && (case currentAcceptVal of Bottom -> True; Deposit _ -> True; _ -> False) && (case cliCommand of Deposit _ -> True; _ -> False) then do
