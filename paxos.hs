@@ -4,18 +4,11 @@
 --------------------
 
 {- 
-
-    ssh -i lawton-oregon.pem ubuntu@54.148.215.60
+    ssh -i lawton-nvirginia.pem ubuntu@54.172.102.178
     ssh -i lawton-ireland.pem ubuntu@54.76.113.250
-    ssh -i lawton-frankfurt.pem ubuntu@54.93.180.143
+    ssh -i lawton-ncalifornia.pem ubuntu@54.183.61.204
     ssh -i lawton-singapore.pem ubuntu@54.169.171.162
-    ssh -i lawton-tokyo.pem ubuntu@54.65.136.5
-
-    ./paxos [54,148,215,60]
-    ./paxos [54,76,113,250]
-    ./paxos [54,93,180,143]
-    ./paxos [54,169,171,162]
-    ./paxos [54,65,136,5]
+    ssh -i lawton-saopaulo.pem ubuntu@54.94.182.224
 
     git clone https://github.com/lawtonnichols/CS-271-Project.git
 
@@ -41,7 +34,7 @@ majority = floor (numberOfSites / 2) + 1
 
 type IPAddress = [Int] 
 
-sites = [[54,148,215,60], [54,76,113,250], [54,93,180,143], [54,169,171,162], [54,65,136,5]] :: [IPAddress]
+sites = [[54,172,102,178],[54,76,113,250],[54,183,61,204],[54,169,171,162],[54,94,182,224]] :: [IPAddress]
 
 type BallotNumber = Int
 
