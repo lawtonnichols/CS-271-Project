@@ -487,6 +487,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
                 atomicModifyIORef' ackCounter (\old -> (0, ()))
+                atomicModifyIORef' receivedVals (\old -> ([], ()))
                 -- TODO: do I need to update the acceptCounter?
             else if currentLogLength < logIndex then do
                 -- we don't know enough; get everyone else's log & try again
@@ -512,6 +513,7 @@ processMessage hdl message ballotNum acceptNum acceptVal ackCounter acceptCounte
                 atomicModifyIORef' acceptNum (\_ -> ((Ballot 0 [0,0,0,0]),()))
                 atomicModifyIORef' acceptVal (\old -> (Bottom, ()))
                 atomicModifyIORef' ackCounter (\old -> (0, ()))
+                atomicModifyIORef' receivedVals (\old -> ([], ()))
                 putStrLn "Error: Log size was too small; any pending command has failed."
             else return ()
 
