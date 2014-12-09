@@ -6,7 +6,7 @@
 {- 
     ssh -i lawton-nvirginia.pem ubuntu@54.172.102.178
     ssh -i lawton-ireland.pem ubuntu@54.76.113.250
-    ssh -i lawton-ncalifornia.pem ubuntu@54.183.61.204
+    ssh -i lawton-ncalifornia.pem ubuntu@54.183.94.6
     ssh -i lawton-singapore.pem ubuntu@54.169.171.162
     ssh -i lawton-saopaulo.pem ubuntu@54.94.182.224
 
@@ -37,7 +37,7 @@ majority = floor (numberOfSites / 2) + 1
 
 type IPAddress = [Int] 
 
-sites = [[54,172,102,178],[54,76,113,250],[54,183,61,204],[54,169,171,162],[54,94,182,224]] :: [IPAddress]
+sites = [[54,172,102,178],[54,76,113,250],[54,183,94,6],[54,169,171,162],[54,94,182,224]] :: [IPAddress]
 
 type BallotNumber = Int
 
